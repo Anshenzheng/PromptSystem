@@ -2,9 +2,9 @@ import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { Prompt, Tag } from '../models/prompt.model';
-import { PromptService } from '../services/prompt.service';
-import { TagService } from '../services/tag.service';
+import { Prompt, Tag } from '../../models/prompt.model';
+import { PromptService } from '../../services/prompt.service';
+import { TagService } from '../../services/tag.service';
 
 @Component({
   selector: 'app-prompt-list',

@@ -2,9 +2,9 @@ import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { QuickTag, GenerateRequest } from '../models/prompt.model';
-import { GenerateService } from '../services/generate.service';
-import { TagService } from '../services/tag.service';
+import { QuickTag, GenerateRequest } from '../../models/prompt.model';
+import { GenerateService } from '../../services/generate.service';
+import { TagService } from '../../services/tag.service';
 
 @Component({
   selector: 'app-generate-prompt',
