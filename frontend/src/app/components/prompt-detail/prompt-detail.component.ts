@@ -1,8 +1,8 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
-import { Prompt } from '../models/prompt.model';
-import { PromptService } from '../services/prompt.service';
+import { Prompt } from '../../models/prompt.model';
+import { PromptService } from '../../services/prompt.service';
 
 @Component({
   selector: 'app-prompt-detail',
