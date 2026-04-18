@@ -98,7 +98,7 @@ import { TagService } from '../../services/tag.service';
                 type="text" 
                 [(ngModel)]="newTag" 
                 name="newTag"
-                (keyup.enter)="addTag()"
+                (keydown.enter)="addTag(); $event.preventDefault()"
                 placeholder="输入标签后按回车添加"
                 class="form-input tag-input-field"
               >
