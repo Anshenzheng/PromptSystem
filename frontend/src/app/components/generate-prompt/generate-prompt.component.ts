@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -32,11 +32,11 @@ import { TagService } from '../../services/tag.service';
           <div class="quick-tags-section">
             <h3 class="section-title">快速选择（可选）</h3>
             
-            @if (quickTags().style && quickTags().style.length > 0) {
+            @if (styleTags().length > 0) {
               <div class="quick-tag-group">
                 <label class="group-label">🎨 风格</label>
                 <div class="tag-options">
-                  @for (tag of quickTags().style; track tag.id) {
+                  @for (tag of styleTags(); track tag.id) {
                     <button 
                       type="button"
                       (click)="toggleTag('style', tag.name)"
@@ -50,11 +50,11 @@ import { TagService } from '../../services/tag.service';
               </div>
             }
             
-            @if (quickTags().scene && quickTags().scene.length > 0) {
+            @if (sceneTags().length > 0) {
               <div class="quick-tag-group">
                 <label class="group-label">📍 场景</label>
                 <div class="tag-options">
-                  @for (tag of quickTags().scene; track tag.id) {
+                  @for (tag of sceneTags(); track tag.id) {
                     <button 
                       type="button"
                       (click)="toggleTag('scene', tag.name)"
@@ -68,11 +68,11 @@ import { TagService } from '../../services/tag.service';
               </div>
             }
             
-            @if (quickTags().function && quickTags().function.length > 0) {
+            @if (functionTags().length > 0) {
               <div class="quick-tag-group">
                 <label class="group-label">⚡ 功能</label>
                 <div class="tag-options">
-                  @for (tag of quickTags().function; track tag.id) {
+                  @for (tag of functionTags(); track tag.id) {
                     <button 
                       type="button"
                       (click)="toggleTag('function', tag.name)"
@@ -409,6 +409,10 @@ export class GeneratePromptComponent implements OnInit {
   generatedPrompt = signal<string>('');
   generating = signal<boolean>(false);
   error = signal<string>('');
+  
+  styleTags = computed(() => this.quickTags()['style'] || []);
+  sceneTags = computed(() => this.quickTags()['scene'] || []);
+  functionTags = computed(() => this.quickTags()['function'] || []);
   
   constructor(
     private generateService: GenerateService,
