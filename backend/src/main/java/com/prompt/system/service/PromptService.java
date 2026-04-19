@@ -376,18 +376,14 @@ public class PromptService {
             return false;
         }
         if (prompt.getUserId() == null) {
-            return true;
+            return false;
         }
         return currentUserId.equals(prompt.getUserId());
     }
     
     private void setOwnerFlag(Prompt prompt, Long currentUserId) {
-        if (currentUserId != null) {
-            if (prompt.getUserId() == null || currentUserId.equals(prompt.getUserId())) {
-                prompt.setIsOwner(true);
-            } else {
-                prompt.setIsOwner(false);
-            }
+        if (currentUserId != null && prompt.getUserId() != null) {
+            prompt.setIsOwner(currentUserId.equals(prompt.getUserId()));
         } else {
             prompt.setIsOwner(false);
         }

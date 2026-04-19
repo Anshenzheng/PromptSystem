@@ -19,6 +19,6 @@ spring:
 
 deepseek:
   api:
-    key: sk-a6f9aa0f94754bd18cd60059eafedeca
+    key: sk-db81dfdcc20c429eb910e0abbb4706a5
     url: https://api.deepseek.com/v1/chat/completions
     model: deepseek-chat
