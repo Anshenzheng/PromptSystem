@@ -145,6 +145,13 @@ import { PromptService } from '../../services/prompt.service';
                     }
                   </select>
                 </div>
+                <div class="meta-item">
+                  <span class="meta-label">可见性</span>
+                  <select [(ngModel)]="editIsPublic" class="meta-select">
+                    <option [ngValue]="true">公开</option>
+                    <option [ngValue]="false">私有</option>
+                  </select>
+                </div>
               </div>
               
               <div class="meta-item full-width">
@@ -614,6 +621,7 @@ export class GeneratePromptComponent implements OnInit {
   editDescription = '';
   editCategory = '';
   editParentId: number | null = null;
+  editIsPublic: boolean = true;
   editTags = signal<string[]>([]);
   newTagInput = '';
   
@@ -777,7 +785,8 @@ export class GeneratePromptComponent implements OnInit {
       description: this.editDescription?.trim() || undefined,
       category: this.editCategory?.trim() || undefined,
       tags: [...this.editTags()],
-      parentId: this.editParentId
+      parentId: this.editParentId,
+      isPublic: this.editIsPublic
     };
     
     this.promptService.createPrompt(data).subscribe({

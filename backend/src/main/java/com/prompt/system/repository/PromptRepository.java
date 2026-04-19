@@ -32,4 +32,8 @@ public interface PromptRepository extends JpaRepository<Prompt, Long> {
     
     @Query("SELECT p FROM Prompt p WHERE p.lastUsedAt IS NOT NULL ORDER BY p.lastUsedAt DESC")
     List<Prompt> findRecentlyUsed();
+    
+    List<Prompt> findByIsPublicTrue();
+    
+    List<Prompt> findByIsPublicTrueOrUserId(Long userId);
 }

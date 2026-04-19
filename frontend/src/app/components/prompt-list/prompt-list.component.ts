@@ -85,10 +85,17 @@ import { PromptModalComponent } from '../prompt-modal/prompt-modal.component';
           <div class="prompt-card">
             <div class="card-header" (click)="openModal(prompt)">
               <h3 class="card-title">{{ prompt.title }}</h3>
-              @if (hasRelation(prompt)) {
-                <span class="relation-badge">
-                  {{ getRelationLabel(prompt) }}
-                </span>
+              @if (hasRelation(prompt) || !prompt.isPublic) {
+                <div class="badges">
+                  @if (hasRelation(prompt)) {
+                    <span class="relation-badge">
+                      {{ getRelationLabel(prompt) }}
+                    </span>
+                  }
+                  @if (!prompt.isPublic) {
+                    <span class="private-badge">私有</span>
+                  }
+                </div>
               }
               <div class="card-actions" (click)="$event.stopPropagation()">
                 <button 
@@ -98,20 +105,22 @@ import { PromptModalComponent } from '../prompt-modal/prompt-modal.component';
                 >
                   📋
                 </button>
-                <a 
-                  [routerLink]="['/prompts', prompt.id, 'edit']" 
-                  class="icon-btn" 
-                  title="编辑"
-                >
-                  ✏️
-                </a>
-                <button 
-                  (click)="confirmDelete(prompt)" 
-                  class="icon-btn icon-btn-danger" 
-                  title="删除"
-                >
-                  🗑️
-                </button>
+                @if (prompt.isOwner) {
+                  <a 
+                    [routerLink]="['/prompts', prompt.id, 'edit']" 
+                    class="icon-btn" 
+                    title="编辑"
+                  >
+                    ✏️
+                  </a>
+                  <button 
+                    (click)="confirmDelete(prompt)" 
+                    class="icon-btn icon-btn-danger" 
+                    title="删除"
+                  >
+                    🗑️
+                  </button>
+                }
               </div>
             </div>
             
@@ -292,10 +301,27 @@ import { PromptModalComponent } from '../prompt-modal/prompt-modal.component';
       flex: 1;
     }
     
+    .badges {
+      display: flex;
+      gap: 0.25rem;
+      flex-wrap: wrap;
+    }
+    
     .relation-badge {
       display: inline-block;
       padding: 0.2rem 0.5rem;
       background-color: var(--accent-color);
+      color: white;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    
+    .private-badge {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      background-color: #f59e0b;
       color: white;
       border-radius: 4px;
       font-size: 0.7rem;

@@ -22,31 +22,76 @@ public class PromptService {
     private TagRepository tagRepository;
     
     public List<Prompt> getAllPrompts() {
-        List<Prompt> prompts = promptRepository.findAll();
+        Long currentUserId = UserContext.getCurrentUserId();
+        List<Prompt> prompts;
+        
+        if (currentUserId != null) {
+            prompts = promptRepository.findByIsPublicTrueOrUserId(currentUserId);
+        } else {
+            prompts = promptRepository.findByIsPublicTrue();
+        }
+        
         for (Prompt prompt : prompts) {
             loadRelationInfo(prompt);
+            setOwnerFlag(prompt, currentUserId);
         }
         return prompts;
     }
     
     public Optional<Prompt> getPromptById(Long id) {
-        return promptRepository.findById(id).map(prompt -> {
-            loadRelationInfo(prompt);
-            return prompt;
-        });
+        Long currentUserId = UserContext.getCurrentUserId();
+        
+        Optional<Prompt> promptOpt = promptRepository.findById(id);
+        if (promptOpt.isEmpty()) {
+            return Optional.empty();
+        }
+        
+        Prompt prompt = promptOpt.get();
+        
+        if (currentUserId == null) {
+            if (prompt.getIsPublic() == null || !prompt.getIsPublic()) {
+                return Optional.empty();
+            }
+        } else {
+            if (!prompt.getIsPublic() && !currentUserId.equals(prompt.getUserId())) {
+                return Optional.empty();
+            }
+        }
+        
+        loadRelationInfo(prompt);
+        setOwnerFlag(prompt, currentUserId);
+        return Optional.of(prompt);
     }
     
     public Optional<Prompt> getPromptWithFullChain(Long id) {
-        return promptRepository.findById(id).map(prompt -> {
-            Prompt chain = buildChain(prompt);
-            prompt.setFullChain(chain);
-            loadRelationInfo(prompt);
-            return prompt;
-        });
+        Long currentUserId = UserContext.getCurrentUserId();
+        
+        Optional<Prompt> promptOpt = promptRepository.findById(id);
+        if (promptOpt.isEmpty()) {
+            return Optional.empty();
+        }
+        
+        Prompt prompt = promptOpt.get();
+        
+        if (currentUserId == null) {
+            if (prompt.getIsPublic() == null || !prompt.getIsPublic()) {
+                return Optional.empty();
+            }
+        } else {
+            if (!prompt.getIsPublic() && !currentUserId.equals(prompt.getUserId())) {
+                return Optional.empty();
+            }
+        }
+        
+        Prompt chain = buildChain(prompt);
+        prompt.setFullChain(chain);
+        loadRelationInfo(prompt);
+        setOwnerFlag(prompt, currentUserId);
+        return Optional.of(prompt);
     }
     
     @Transactional
-    public Map<String, Object> createPrompt(Prompt prompt, List<String> tagNames, Long parentId) {
+    public Map<String, Object> createPrompt(Prompt prompt, List<String> tagNames, Long parentId, Boolean isPublic) {
         Map<String, Object> result = new HashMap<>();
         
         Long currentUserId = UserContext.getCurrentUserId();
@@ -89,8 +134,15 @@ public class PromptService {
         prompt.setTags(tags);
         prompt.setUserId(currentUserId);
         
+        if (isPublic != null) {
+            prompt.setIsPublic(isPublic);
+        } else {
+            prompt.setIsPublic(true);
+        }
+        
         Prompt savedPrompt = promptRepository.save(prompt);
         loadRelationInfo(savedPrompt);
+        setOwnerFlag(savedPrompt, currentUserId);
         
         result.put("success", true);
         result.put("prompt", savedPrompt);
@@ -98,7 +150,7 @@ public class PromptService {
     }
     
     @Transactional
-    public Map<String, Object> updatePrompt(Long id, Prompt updatedPrompt, List<String> tagNames, Long parentId) {
+    public Map<String, Object> updatePrompt(Long id, Prompt updatedPrompt, List<String> tagNames, Long parentId, Boolean isPublic) {
         Map<String, Object> result = new HashMap<>();
         
         Long currentUserId = UserContext.getCurrentUserId();
@@ -117,7 +169,9 @@ public class PromptService {
         
         Prompt existing = existingOpt.get();
         
-        if (existing.getUserId() != null && !existing.getUserId().equals(currentUserId)) {
+        if (existing.getUserId() == null) {
+            existing.setUserId(currentUserId);
+        } else if (!existing.getUserId().equals(currentUserId)) {
             result.put("success", false);
             result.put("message", "您没有权限修改此提示词");
             return result;
@@ -127,6 +181,10 @@ public class PromptService {
         existing.setContent(updatedPrompt.getContent());
         existing.setDescription(updatedPrompt.getDescription());
         existing.setCategory(updatedPrompt.getCategory());
+        
+        if (isPublic != null) {
+            existing.setIsPublic(isPublic);
+        }
         
         if (parentId != null && !parentId.equals(id)) {
             if (existing.getParent() == null || !existing.getParent().getId().equals(parentId)) {
@@ -172,6 +230,7 @@ public class PromptService {
         
         Prompt savedPrompt = promptRepository.save(existing);
         loadRelationInfo(savedPrompt);
+        setOwnerFlag(savedPrompt, currentUserId);
         
         result.put("success", true);
         result.put("prompt", savedPrompt);
@@ -197,7 +256,9 @@ public class PromptService {
         }
         
         Prompt prompt = promptOpt.get();
-        if (prompt.getUserId() != null && !prompt.getUserId().equals(currentUserId)) {
+        if (prompt.getUserId() == null) {
+            prompt.setUserId(currentUserId);
+        } else if (!prompt.getUserId().equals(currentUserId)) {
             result.put("success", false);
             result.put("message", "您没有权限删除此提示词");
             return result;
@@ -223,19 +284,33 @@ public class PromptService {
     }
     
     public List<Prompt> searchByKeyword(String keyword) {
-        List<Prompt> prompts = promptRepository.searchByKeyword(keyword);
-        for (Prompt prompt : prompts) {
-            loadRelationInfo(prompt);
+        Long currentUserId = UserContext.getCurrentUserId();
+        List<Prompt> allPrompts = promptRepository.searchByKeyword(keyword);
+        List<Prompt> filtered = new ArrayList<>();
+        
+        for (Prompt prompt : allPrompts) {
+            if (canView(prompt, currentUserId)) {
+                loadRelationInfo(prompt);
+                setOwnerFlag(prompt, currentUserId);
+                filtered.add(prompt);
+            }
         }
-        return prompts;
+        return filtered;
     }
     
     public List<Prompt> filterByCategoryAndTag(String category, Long tagId) {
-        List<Prompt> prompts = promptRepository.filterByCategoryAndTag(category, tagId);
-        for (Prompt prompt : prompts) {
-            loadRelationInfo(prompt);
+        Long currentUserId = UserContext.getCurrentUserId();
+        List<Prompt> allPrompts = promptRepository.filterByCategoryAndTag(category, tagId);
+        List<Prompt> filtered = new ArrayList<>();
+        
+        for (Prompt prompt : allPrompts) {
+            if (canView(prompt, currentUserId)) {
+                loadRelationInfo(prompt);
+                setOwnerFlag(prompt, currentUserId);
+                filtered.add(prompt);
+            }
         }
-        return prompts;
+        return filtered;
     }
     
     public List<String> getAllCategories() {
@@ -243,22 +318,37 @@ public class PromptService {
     }
     
     public List<Prompt> getMostUsedPrompts() {
-        List<Prompt> prompts = promptRepository.findByOrderByUsageCountDesc();
-        for (Prompt prompt : prompts) {
-            loadRelationInfo(prompt);
+        Long currentUserId = UserContext.getCurrentUserId();
+        List<Prompt> allPrompts = promptRepository.findByOrderByUsageCountDesc();
+        List<Prompt> filtered = new ArrayList<>();
+        
+        for (Prompt prompt : allPrompts) {
+            if (canView(prompt, currentUserId)) {
+                loadRelationInfo(prompt);
+                setOwnerFlag(prompt, currentUserId);
+                filtered.add(prompt);
+            }
         }
-        return prompts;
+        return filtered;
     }
     
     public List<Prompt> getRecentlyUsedPrompts() {
-        List<Prompt> prompts = promptRepository.findRecentlyUsed();
-        for (Prompt prompt : prompts) {
-            loadRelationInfo(prompt);
+        Long currentUserId = UserContext.getCurrentUserId();
+        List<Prompt> allPrompts = promptRepository.findRecentlyUsed();
+        List<Prompt> filtered = new ArrayList<>();
+        
+        for (Prompt prompt : allPrompts) {
+            if (canView(prompt, currentUserId)) {
+                loadRelationInfo(prompt);
+                setOwnerFlag(prompt, currentUserId);
+                filtered.add(prompt);
+            }
         }
-        return prompts;
+        return filtered;
     }
     
     public List<Prompt> getAvailableParents(Long excludeId) {
+        Long currentUserId = UserContext.getCurrentUserId();
         List<Prompt> allPrompts = promptRepository.findAll();
         List<Prompt> available = new ArrayList<>();
         
@@ -266,12 +356,41 @@ public class PromptService {
             if (excludeId != null && prompt.getId().equals(excludeId)) {
                 continue;
             }
-            if (prompt.getChild() == null) {
+            if (prompt.getChild() == null && canEdit(prompt, currentUserId)) {
                 Prompt parentInfo = createMinimalPrompt(prompt);
                 available.add(parentInfo);
             }
         }
         return available;
+    }
+    
+    private boolean canView(Prompt prompt, Long currentUserId) {
+        if (prompt.getIsPublic() == null || prompt.getIsPublic()) {
+            return true;
+        }
+        return currentUserId != null && currentUserId.equals(prompt.getUserId());
+    }
+    
+    private boolean canEdit(Prompt prompt, Long currentUserId) {
+        if (currentUserId == null) {
+            return false;
+        }
+        if (prompt.getUserId() == null) {
+            return true;
+        }
+        return currentUserId.equals(prompt.getUserId());
+    }
+    
+    private void setOwnerFlag(Prompt prompt, Long currentUserId) {
+        if (currentUserId != null) {
+            if (prompt.getUserId() == null || currentUserId.equals(prompt.getUserId())) {
+                prompt.setIsOwner(true);
+            } else {
+                prompt.setIsOwner(false);
+            }
+        } else {
+            prompt.setIsOwner(false);
+        }
     }
     
     private void loadRelationInfo(Prompt prompt) {

@@ -61,6 +61,9 @@ export interface Prompt {
   parentInfo?: Prompt;
   childInfo?: Prompt;
   fullChain?: PromptChain;
+  userId?: number;
+  isPublic?: boolean;
+  isOwner?: boolean;
 }
 
 export interface PromptFormData {
@@ -70,6 +73,7 @@ export interface PromptFormData {
   category?: string;
   tags: string[];
   parentId?: number | null;
+  isPublic?: boolean;
 }
 
 export interface GenerateRequest {
