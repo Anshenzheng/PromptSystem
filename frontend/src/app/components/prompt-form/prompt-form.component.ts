@@ -2,7 +2,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { Prompt, Tag } from '../../models/prompt.model';
+import { Prompt, Tag, PromptFormData } from '../../models/prompt.model';
 import { PromptService } from '../../services/prompt.service';
 import { TagService } from '../../services/tag.service';
 
@@ -54,6 +54,21 @@ import { TagService } from '../../services/tag.service';
                 }
               </div>
             </div>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">级联父级（可选）</label>
+            <select 
+              [(ngModel)]="formData.parentId"
+              name="parentId"
+              class="form-input"
+            >
+              <option [ngValue]="null">无极联</option>
+              @for (parent of availableParents(); track parent.id) {
+                <option [ngValue]="parent.id">{{ parent.title }}</option>
+              }
+            </select>
+            <p class="form-hint">每个提示词最多允许一个父级和一个子级联提示词</p>
           </div>
           
           <div class="form-group">
@@ -117,6 +132,12 @@ import { TagService } from '../../services/tag.service';
             </div>
           </div>
         </div>
+        
+        @if (errorMessage()) {
+          <div class="error-alert">
+            {{ errorMessage() }}
+          </div>
+        }
         
         <div class="form-actions">
           <button 
@@ -221,6 +242,12 @@ import { TagService } from '../../services/tag.service';
       box-shadow: 0 0 0 3px var(--accent-glow);
     }
     
+    .form-hint {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin: 0;
+    }
+    
     .category-input {
       display: flex;
       flex-direction: column;
@@ -296,6 +323,16 @@ import { TagService } from '../../services/tag.service';
       flex: 1;
     }
     
+    .error-alert {
+      padding: 0.875rem 1rem;
+      background-color: rgba(239, 68, 68, 0.1);
+      border: 1px solid var(--error-color);
+      border-radius: 8px;
+      color: var(--error-color);
+      font-size: 0.9rem;
+      margin-top: 1rem;
+    }
+    
     .form-actions {
       display: flex;
       gap: 1rem;
@@ -348,15 +385,18 @@ export class PromptFormComponent implements OnInit {
   promptId: number | null = null;
   existingCategories = signal<string[]>([]);
   existingTags = signal<Tag[]>([]);
+  availableParents = signal<Prompt[]>([]);
   submitting = signal<boolean>(false);
+  errorMessage = signal<string>('');
   newTag = '';
   
-  formData = {
+  formData: PromptFormData = {
     title: '',
     content: '',
     description: '',
     category: '',
-    tags: [] as string[]
+    tags: [],
+    parentId: null
   };
   
   constructor(
@@ -375,6 +415,24 @@ export class PromptFormComponent implements OnInit {
       this.promptId = parseInt(id, 10);
       this.loadPrompt(this.promptId);
     }
+    
+    const savedData = sessionStorage.getItem('newPromptData');
+    if (savedData && !this.isEdit) {
+      try {
+        const data = JSON.parse(savedData);
+        this.formData = {
+          title: data.title || '',
+          content: data.content || '',
+          description: data.description || '',
+          category: data.category || '',
+          tags: data.tags || [],
+          parentId: null
+        };
+        sessionStorage.removeItem('newPromptData');
+      } catch (e) {
+        console.error('Failed to parse saved data:', e);
+      }
+    }
   }
   
   loadExistingData(): void {
@@ -387,6 +445,11 @@ export class PromptFormComponent implements OnInit {
       next: (tags) => this.existingTags.set(tags),
       error: (err) => console.error('Failed to load tags:', err)
     });
+    
+    this.promptService.getAvailableParents(this.promptId || undefined).subscribe({
+      next: (parents) => this.availableParents.set(parents),
+      error: (err) => console.error('Failed to load parents:', err)
+    });
   }
   
   loadPrompt(id: number): void {
@@ -397,7 +460,8 @@ export class PromptFormComponent implements OnInit {
           content: prompt.content,
           description: prompt.description || '',
           category: prompt.category || '',
-          tags: prompt.tags.map(t => t.name)
+          tags: prompt.tags.map(t => t.name),
+          parentId: prompt.parentInfo?.id || null
         };
       },
       error: (err) => {
@@ -443,13 +507,15 @@ export class PromptFormComponent implements OnInit {
     if (!this.isValid()) return;
     
     this.submitting.set(true);
+    this.errorMessage.set('');
     
-    const data = {
+    const data: PromptFormData = {
       title: this.formData.title.trim(),
       content: this.formData.content.trim(),
       description: this.formData.description?.trim() || undefined,
       category: this.formData.category?.trim() || undefined,
-      tags: this.formData.tags
+      tags: this.formData.tags,
+      parentId: this.formData.parentId
     };
     
     const request = this.isEdit 
@@ -464,7 +530,11 @@ export class PromptFormComponent implements OnInit {
       error: (err) => {
         console.error('Failed to save:', err);
         this.submitting.set(false);
-        alert('保存失败，请重试');
+        if (err.error?.message) {
+          this.errorMessage.set(err.error.message);
+        } else {
+          this.errorMessage.set('保存失败，请重试');
+        }
       }
     });
   }

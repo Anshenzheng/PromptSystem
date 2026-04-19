@@ -1,15 +1,16 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Prompt, Tag } from '../../models/prompt.model';
 import { PromptService } from '../../services/prompt.service';
 import { TagService } from '../../services/tag.service';
+import { PromptModalComponent } from '../prompt-modal/prompt-modal.component';
 
 @Component({
   selector: 'app-prompt-list',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule],
+  imports: [CommonModule, RouterModule, FormsModule, PromptModalComponent],
   template: `
     <div class="list-container">
       <div class="list-header">
@@ -82,9 +83,14 @@ import { TagService } from '../../services/tag.service';
         
         @for (prompt of prompts(); track prompt.id) {
           <div class="prompt-card">
-            <div class="card-header">
+            <div class="card-header" (click)="openModal(prompt)">
               <h3 class="card-title">{{ prompt.title }}</h3>
-              <div class="card-actions">
+              @if (hasRelation(prompt)) {
+                <span class="relation-badge">
+                  {{ getRelationLabel(prompt) }}
+                </span>
+              }
+              <div class="card-actions" (click)="$event.stopPropagation()">
                 <button 
                   (click)="copyContent(prompt)" 
                   class="icon-btn" 
@@ -110,10 +116,10 @@ import { TagService } from '../../services/tag.service';
             </div>
             
             @if (prompt.description) {
-              <p class="card-description">{{ prompt.description }}</p>
+              <p class="card-description" (click)="openModal(prompt)">{{ prompt.description }}</p>
             }
             
-            <div class="card-content-preview">
+            <div class="card-content-preview" (click)="openModal(prompt)">
               <code>{{ truncateContent(prompt.content) }}</code>
             </div>
             
@@ -134,6 +140,12 @@ import { TagService } from '../../services/tag.service';
         }
       </div>
     </div>
+    
+    <app-prompt-modal 
+      [prompt]="selectedPrompt" 
+      [visible]="modalVisible"
+      (close)="closeModal()"
+    />
   `,
   styles: [`
     .list-container {
@@ -258,6 +270,7 @@ import { TagService } from '../../services/tag.service';
       flex-direction: column;
       gap: 1rem;
       transition: border-color 0.2s, box-shadow 0.2s;
+      cursor: pointer;
     }
     
     .prompt-card:hover {
@@ -277,6 +290,17 @@ import { TagService } from '../../services/tag.service';
       font-size: 1.05rem;
       font-weight: 600;
       flex: 1;
+    }
+    
+    .relation-badge {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      background-color: var(--accent-color);
+      color: white;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      white-space: nowrap;
     }
     
     .card-actions {
@@ -384,6 +408,9 @@ export class PromptListComponent implements OnInit {
   selectedCategory = '';
   selectedTagId: number | null = null;
   sortBy = 'default';
+  
+  modalVisible = signal(false);
+  selectedPrompt = signal<Prompt | null>(null);
   
   private allPrompts: Prompt[] = [];
   private searchTimeout: any;
@@ -500,5 +527,40 @@ export class PromptListComponent implements OnInit {
         error: (err) => console.error('Failed to delete:', err)
       });
     }
+  }
+  
+  hasRelation(prompt: Prompt): boolean {
+    return !!(prompt.parentInfo || prompt.childInfo);
+  }
+  
+  getRelationLabel(prompt: Prompt): string {
+    if (prompt.parentInfo && prompt.childInfo) {
+      return '有级联';
+    }
+    if (prompt.parentInfo) {
+      return '有父级';
+    }
+    if (prompt.childInfo) {
+      return '有子级';
+    }
+    return '';
+  }
+  
+  openModal(prompt: Prompt): void {
+    this.promptService.getPromptWithChain(prompt.id).subscribe({
+      next: (fullPrompt) => {
+        this.selectedPrompt.set(fullPrompt);
+        this.modalVisible.set(true);
+      },
+      error: () => {
+        this.selectedPrompt.set(prompt);
+        this.modalVisible.set(true);
+      }
+    });
+  }
+  
+  closeModal(): void {
+    this.modalVisible.set(false);
+    this.selectedPrompt.set(null);
   }
 }

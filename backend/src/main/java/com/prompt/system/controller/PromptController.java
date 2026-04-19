@@ -30,8 +30,21 @@ public class PromptController {
             .orElse(ResponseEntity.notFound().build());
     }
     
+    @GetMapping("/{id}/chain")
+    public ResponseEntity<Prompt> getPromptWithChain(@PathVariable Long id) {
+        return promptService.getPromptWithFullChain(id)
+            .map(ResponseEntity::ok)
+            .orElse(ResponseEntity.notFound().build());
+    }
+    
+    @GetMapping("/available-parents")
+    public List<Prompt> getAvailableParents(
+            @RequestParam(required = false) Long excludeId) {
+        return promptService.getAvailableParents(excludeId);
+    }
+    
     @PostMapping
-    public Prompt createPrompt(@RequestBody Map<String, Object> request) {
+    public ResponseEntity<?> createPrompt(@RequestBody Map<String, Object> request) {
         Prompt prompt = new Prompt();
         prompt.setTitle((String) request.get("title"));
         prompt.setContent((String) request.get("content"));
@@ -41,11 +54,30 @@ public class PromptController {
         @SuppressWarnings("unchecked")
         List<String> tagNames = (List<String>) request.get("tags");
         
-        return promptService.createPrompt(prompt, tagNames);
+        Long parentId = null;
+        if (request.get("parentId") != null) {
+            if (request.get("parentId") instanceof Number) {
+                parentId = ((Number) request.get("parentId")).longValue();
+            } else if (request.get("parentId") instanceof String) {
+                try {
+                    parentId = Long.parseLong((String) request.get("parentId"));
+                } catch (NumberFormatException e) {
+                    parentId = null;
+                }
+            }
+        }
+        
+        Map<String, Object> result = promptService.createPrompt(prompt, tagNames, parentId);
+        
+        if ((boolean) result.get("success")) {
+            return ResponseEntity.ok(result.get("prompt"));
+        } else {
+            return ResponseEntity.badRequest().body(result);
+        }
     }
     
     @PutMapping("/{id}")
-    public ResponseEntity<Prompt> updatePrompt(@PathVariable Long id, @RequestBody Map<String, Object> request) {
+    public ResponseEntity<?> updatePrompt(@PathVariable Long id, @RequestBody Map<String, Object> request) {
         Prompt updatedPrompt = new Prompt();
         updatedPrompt.setTitle((String) request.get("title"));
         updatedPrompt.setContent((String) request.get("content"));
@@ -55,9 +87,26 @@ public class PromptController {
         @SuppressWarnings("unchecked")
         List<String> tagNames = (List<String>) request.get("tags");
         
-        return promptService.updatePrompt(id, updatedPrompt, tagNames)
-            .map(ResponseEntity::ok)
-            .orElse(ResponseEntity.notFound().build());
+        Long parentId = null;
+        if (request.get("parentId") != null) {
+            if (request.get("parentId") instanceof Number) {
+                parentId = ((Number) request.get("parentId")).longValue();
+            } else if (request.get("parentId") instanceof String) {
+                try {
+                    parentId = Long.parseLong((String) request.get("parentId"));
+                } catch (NumberFormatException e) {
+                    parentId = null;
+                }
+            }
+        }
+        
+        Map<String, Object> result = promptService.updatePrompt(id, updatedPrompt, tagNames, parentId);
+        
+        if ((boolean) result.get("success")) {
+            return ResponseEntity.ok(result.get("prompt"));
+        } else {
+            return ResponseEntity.badRequest().body(result);
+        }
     }
     
     @DeleteMapping("/{id}")

@@ -19,6 +19,18 @@ export class PromptService {
     return this.http.get<Prompt>(`${this.apiUrl}/${id}`);
   }
 
+  getPromptWithChain(id: number): Observable<Prompt> {
+    return this.http.get<Prompt>(`${this.apiUrl}/${id}/chain`);
+  }
+
+  getAvailableParents(excludeId?: number): Observable<Prompt[]> {
+    let params = new HttpParams();
+    if (excludeId) {
+      params = params.set('excludeId', excludeId.toString());
+    }
+    return this.http.get<Prompt[]>(`${this.apiUrl}/available-parents`, { params });
+  }
+
   createPrompt(data: PromptFormData): Observable<Prompt> {
     return this.http.post<Prompt>(this.apiUrl, data);
   }
