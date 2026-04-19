@@ -1,7 +1,8 @@
-import { Component } from '@angular/core';
+import { Component, computed } from '@angular/core';
 import { RouterOutlet, RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { ThemeService } from './services/theme.service';
+import { AuthService } from './services/auth.service';
 
 @Component({
   selector: 'app-root',
@@ -19,9 +20,26 @@ import { ThemeService } from './services/theme.service';
             <a routerLink="/prompts" class="nav-link">列表</a>
             <a routerLink="/generate" class="nav-link">生成</a>
           </nav>
-          <button (click)="toggleTheme()" class="theme-btn" [attr.aria-label]="isDark ? '切换亮色模式' : '切换暗色模式'">
-            {{ isDark ? '☀️' : '🌙' }}
-          </button>
+          <div class="header-right">
+            @if (authService.isLoggedIn()) {
+              <span class="user-info">
+                👋 {{ authService.currentUser()?.username }}
+              </span>
+              <button (click)="logout()" class="nav-btn">
+                退出登录
+              </button>
+            } @else {
+              <a routerLink="/login" class="nav-btn">
+                登录
+              </a>
+              <a routerLink="/register" class="nav-btn nav-btn-primary">
+                注册
+              </a>
+            }
+            <button (click)="toggleTheme()" class="theme-btn" [attr.aria-label]="isDark ? '切换亮色模式' : '切换暗色模式'">
+              {{ isDark ? '☀️' : '🌙' }}
+            </button>
+          </div>
         </div>
       </header>
       <main class="main">
@@ -53,6 +71,7 @@ import { ThemeService } from './services/theme.service';
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 1.5rem;
     }
     
     .logo {
@@ -62,6 +81,7 @@ import { ThemeService } from './services/theme.service';
       display: flex;
       align-items: center;
       gap: 0.5rem;
+      cursor: default;
     }
     
     .logo-icon {
@@ -89,6 +109,45 @@ import { ThemeService } from './services/theme.service';
       border-bottom-color: var(--accent-color);
     }
     
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    
+    .user-info {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+    
+    .nav-btn {
+      padding: 0.4rem 0.875rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      text-decoration: none;
+      cursor: pointer;
+      border: 1px solid var(--border-color);
+      background-color: transparent;
+      color: var(--text-primary);
+      transition: all 0.2s;
+    }
+    
+    .nav-btn:hover {
+      background-color: var(--bg-hover);
+    }
+    
+    .nav-btn-primary {
+      background-color: var(--accent-color);
+      color: white;
+      border-color: var(--accent-color);
+    }
+    
+    .nav-btn-primary:hover {
+      background-color: var(--accent-hover);
+      border-color: var(--accent-hover);
+    }
+    
     .theme-btn {
       background: none;
       border: none;
@@ -111,7 +170,10 @@ import { ThemeService } from './services/theme.service';
   `]
 })
 export class AppComponent {
-  constructor(public themeService: ThemeService) {}
+  constructor(
+    public themeService: ThemeService,
+    public authService: AuthService
+  ) {}
   
   get isDark(): boolean {
     return this.themeService.isDark;
@@ -119,5 +181,9 @@ export class AppComponent {
   
   toggleTheme(): void {
     this.themeService.toggleTheme();
+  }
+  
+  logout(): void {
+    this.authService.logout();
   }
 }

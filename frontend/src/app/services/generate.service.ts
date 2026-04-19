@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { GenerateRequest } from '../models/prompt.model';
+import { GenerateRequest, GeneratedPrompt } from '../models/prompt.model';
 
 @Injectable({
   providedIn: 'root'
@@ -11,7 +11,7 @@ export class GenerateService {
 
   constructor(private http: HttpClient) { }
 
-  generatePrompt(request: GenerateRequest): Observable<{ prompt?: string; error?: string }> {
-    return this.http.post<{ prompt?: string; error?: string }>(this.apiUrl, request);
+  generatePrompt(request: GenerateRequest): Observable<GeneratedPrompt & { error?: string }> {
+    return this.http.post<GeneratedPrompt & { error?: string }>(this.apiUrl, request);
   }
 }

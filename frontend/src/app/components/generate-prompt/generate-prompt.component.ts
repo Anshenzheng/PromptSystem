@@ -2,9 +2,10 @@ import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { QuickTag, GenerateRequest } from '../../models/prompt.model';
+import { QuickTag, GenerateRequest, GeneratedPrompt, Prompt } from '../../models/prompt.model';
 import { GenerateService } from '../../services/generate.service';
 import { TagService } from '../../services/tag.service';
+import { PromptService } from '../../services/prompt.service';
 
 @Component({
   selector: 'app-generate-prompt',
@@ -103,7 +104,7 @@ import { TagService } from '../../services/tag.service';
             </div>
           }
           
-          @if (generatedPrompt()) {
+          @if (generatedResult()) {
             <div class="result-container">
               <div class="result-header">
                 <h3 class="result-title">生成结果</h3>
@@ -111,20 +112,91 @@ import { TagService } from '../../services/tag.service';
                   <button (click)="copyResult()" class="btn btn-outline btn-sm">
                     📋 复制
                   </button>
-                  <button (click)="saveAsPrompt()" class="btn btn-primary btn-sm">
-                    💾 保存
+                  <button (click)="savePrompt()" class="btn btn-primary btn-sm" [disabled]="saving()">
+                    {{ saving() ? '保存中...' : '💾 保存' }}
                   </button>
                 </div>
               </div>
-              <div class="result-content">
-                <pre><code>{{ generatedPrompt() }}</code></pre>
+              
+              <div class="generated-meta">
+                <div class="meta-item">
+                  <span class="meta-label">标题</span>
+                  <input 
+                    type="text" 
+                    [(ngModel)]="editTitle"
+                    class="meta-input"
+                  >
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label">分类</span>
+                  <select [(ngModel)]="editCategory" class="meta-select">
+                    <option value="">无分类</option>
+                    @for (cat of existingCategories(); track cat) {
+                      <option [value]="cat">{{ cat }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label">级联父级</span>
+                  <select [(ngModel)]="editParentId" class="meta-select">
+                    <option [ngValue]="null">无极联</option>
+                    @for (parent of availableParents(); track parent.id) {
+                      <option [ngValue]="parent.id">{{ parent.title }}</option>
+                    }
+                  </select>
+                </div>
+              </div>
+              
+              <div class="meta-item full-width">
+                <span class="meta-label">描述</span>
+                <textarea 
+                  [(ngModel)]="editDescription"
+                  class="meta-textarea"
+                  rows="2"
+                ></textarea>
+              </div>
+              
+              <div class="meta-item full-width">
+                <span class="meta-label">标签</span>
+                <div class="tags-editor">
+                  <div class="selected-tags">
+                    @for (tag of editTags(); track tag) {
+                      <span class="tag">
+                        {{ tag }}
+                        <button 
+                          type="button" 
+                          (click)="removeEditTag(tag)"
+                          class="tag-remove"
+                        >×</button>
+                      </span>
+                    }
+                  </div>
+                  <input 
+                    type="text" 
+                    [(ngModel)]="newTagInput"
+                    (keydown.enter)="addEditTag(); $event.preventDefault()"
+                    placeholder="输入标签后按回车添加"
+                    class="tag-input"
+                  >
+                </div>
+              </div>
+              
+              <div class="content-section">
+                <h4 class="section-title">📝 提示词内容</h4>
+                <div class="result-content">
+                  <textarea 
+                    [(ngModel)]="editContent"
+                    class="content-editor"
+                    rows="12"
+                  ></textarea>
+                </div>
               </div>
             </div>
           } @else {
             <div class="empty-state">
               <div class="empty-icon">✨</div>
               <p>输入需求后点击生成按钮</p>
-              <p class="hint">提示词将由 DeepSeek 大模型智能生成</p>
+              <p class="hint">AI 将生成标题、分类、描述和内容</p>
             </div>
           }
         </div>
@@ -356,6 +428,7 @@ import { TagService } from '../../services/tag.service';
       flex-direction: column;
       gap: 1rem;
       flex: 1;
+      overflow-y: auto;
     }
     
     .result-header {
@@ -364,6 +437,8 @@ import { TagService } from '../../services/tag.service';
       align-items: center;
       gap: 1rem;
       flex-wrap: wrap;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border-color);
     }
     
     .result-title {
@@ -377,38 +452,170 @@ import { TagService } from '../../services/tag.service';
       gap: 0.75rem;
     }
     
+    .generated-meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    
+    @media (max-width: 600px) {
+      .generated-meta {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .meta-item.full-width {
+      grid-column: 1 / -1;
+    }
+    
+    .meta-label {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+    
+    .meta-input, .meta-select {
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 0.9rem;
+    }
+    
+    .meta-input:focus, .meta-select:focus {
+      outline: none;
+      border-color: var(--accent-color);
+    }
+    
+    .meta-textarea {
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 0.9rem;
+      font-family: inherit;
+      resize: vertical;
+      min-height: 60px;
+    }
+    
+    .meta-textarea:focus {
+      outline: none;
+      border-color: var(--accent-color);
+    }
+    
+    .tags-editor {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .selected-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.25rem 0.5rem;
+      background-color: var(--accent-color);
+      color: white;
+      border-radius: 4px;
+      font-size: 0.8rem;
+    }
+    
+    .tag-remove {
+      background: none;
+      border: none;
+      color: white;
+      cursor: pointer;
+      padding: 0;
+      font-size: 0.9rem;
+      line-height: 1;
+      opacity: 0.8;
+    }
+    
+    .tag-remove:hover {
+      opacity: 1;
+    }
+    
+    .tag-input {
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 0.85rem;
+    }
+    
+    .tag-input:focus {
+      outline: none;
+      border-color: var(--accent-color);
+    }
+    
+    .content-section {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .content-editor {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 0.9rem;
+      font-family: 'Consolas', 'Monaco', monospace;
+      resize: vertical;
+      min-height: 200px;
+      line-height: 1.7;
+    }
+    
+    .content-editor:focus {
+      outline: none;
+      border-color: var(--accent-color);
+    }
+    
     .result-content {
-      flex: 1;
       background-color: var(--bg-primary);
       border-radius: 8px;
-      padding: 1.25rem;
-      overflow: auto;
-      max-height: 400px;
-    }
-    
-    .result-content pre {
-      margin: 0;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-    
-    .result-content code {
-      font-family: 'Consolas', 'Monaco', monospace;
-      font-size: 0.9rem;
-      line-height: 1.7;
-      color: var(--text-primary);
     }
   `]
 })
 export class GeneratePromptComponent implements OnInit {
   requirement = '';
   quickTags = signal<{ [key: string]: QuickTag[] }>({});
+  availableParents = signal<Prompt[]>([]);
+  existingCategories = signal<string[]>([]);
+  
   selectedStyles = signal<string[]>([]);
   selectedScenes = signal<string[]>([]);
   selectedFunctions = signal<string[]>([]);
-  generatedPrompt = signal<string>('');
+  
   generating = signal<boolean>(false);
+  saving = signal<boolean>(false);
   error = signal<string>('');
+  generatedResult = signal<GeneratedPrompt | null>(null);
+  
+  editTitle = '';
+  editContent = '';
+  editDescription = '';
+  editCategory = '';
+  editParentId: number | null = null;
+  editTags = signal<string[]>([]);
+  newTagInput = '';
   
   styleTags = computed(() => this.quickTags()['style'] || []);
   sceneTags = computed(() => this.quickTags()['scene'] || []);
@@ -417,17 +624,34 @@ export class GeneratePromptComponent implements OnInit {
   constructor(
     private generateService: GenerateService,
     private tagService: TagService,
+    private promptService: PromptService,
     private router: Router
   ) {}
   
   ngOnInit(): void {
     this.loadQuickTags();
+    this.loadAvailableParents();
+    this.loadCategories();
   }
   
   loadQuickTags(): void {
     this.tagService.getQuickTagsGrouped().subscribe({
       next: (tags) => this.quickTags.set(tags),
       error: (err) => console.error('Failed to load quick tags:', err)
+    });
+  }
+  
+  loadAvailableParents(): void {
+    this.promptService.getAvailableParents().subscribe({
+      next: (parents) => this.availableParents.set(parents),
+      error: (err) => console.error('Failed to load parents:', err)
+    });
+  }
+  
+  loadCategories(): void {
+    this.promptService.getAllCategories().subscribe({
+      next: (cats) => this.existingCategories.set(cats),
+      error: (err) => console.error('Failed to load categories:', err)
     });
   }
   
@@ -467,7 +691,7 @@ export class GeneratePromptComponent implements OnInit {
     
     this.generating.set(true);
     this.error.set('');
-    this.generatedPrompt.set('');
+    this.generatedResult.set(null);
     
     const request: GenerateRequest = {
       requirement: this.requirement.trim()
@@ -485,10 +709,22 @@ export class GeneratePromptComponent implements OnInit {
     
     this.generateService.generatePrompt(request).subscribe({
       next: (response) => {
-        if (response.prompt) {
-          this.generatedPrompt.set(response.prompt);
-        } else if (response.error) {
+        if (response.error) {
           this.error.set(response.error);
+        } else if (response.title || response.content) {
+          this.generatedResult.set({
+            title: response.title || '',
+            content: response.content || '',
+            description: response.description || '',
+            category: response.category || '',
+            tags: response.tags || []
+          });
+          
+          this.editTitle = response.title || '';
+          this.editContent = response.content || '';
+          this.editDescription = response.description || '';
+          this.editCategory = response.category || '';
+          this.editTags.set(response.tags || []);
         }
         this.generating.set(false);
       },
@@ -501,7 +737,7 @@ export class GeneratePromptComponent implements OnInit {
   }
   
   copyResult(): void {
-    const content = this.generatedPrompt();
+    const content = this.editContent;
     if (content) {
       navigator.clipboard.writeText(content).catch(err => {
         console.error('Failed to copy:', err);
@@ -509,17 +745,55 @@ export class GeneratePromptComponent implements OnInit {
     }
   }
   
-  saveAsPrompt(): void {
-    const content = this.generatedPrompt();
-    if (!content) return;
+  addEditTag(): void {
+    const tag = this.newTagInput.trim();
+    if (tag && !this.editTags().includes(tag)) {
+      this.editTags.set([...this.editTags(), tag]);
+      this.newTagInput = '';
+    }
+  }
+  
+  removeEditTag(tag: string): void {
+    const tags = [...this.editTags()];
+    const index = tags.indexOf(tag);
+    if (index !== -1) {
+      tags.splice(index, 1);
+      this.editTags.set(tags);
+    }
+  }
+  
+  savePrompt(): void {
+    if (!this.editTitle.trim() || !this.editContent.trim()) {
+      this.error.set('标题和内容不能为空');
+      return;
+    }
     
-    const savedData = {
-      title: this.requirement.substring(0, 50) + (this.requirement.length > 50 ? '...' : ''),
-      content: content,
-      tags: [...this.selectedStyles(), ...this.selectedScenes(), ...this.selectedFunctions()]
+    this.saving.set(true);
+    this.error.set('');
+    
+    const data = {
+      title: this.editTitle.trim(),
+      content: this.editContent.trim(),
+      description: this.editDescription?.trim() || undefined,
+      category: this.editCategory?.trim() || undefined,
+      tags: [...this.editTags()],
+      parentId: this.editParentId
     };
     
-    sessionStorage.setItem('newPromptData', JSON.stringify(savedData));
-    this.router.navigate(['/prompts/new']);
+    this.promptService.createPrompt(data).subscribe({
+      next: () => {
+        this.saving.set(false);
+        this.router.navigate(['/prompts']);
+      },
+      error: (err) => {
+        this.saving.set(false);
+        if (err.error?.message) {
+          this.error.set(err.error.message);
+        } else {
+          this.error.set('保存失败，请重试');
+        }
+        console.error('Save error:', err);
+      }
+    });
   }
 }

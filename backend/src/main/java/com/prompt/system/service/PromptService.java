@@ -9,10 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 @Service
 public class PromptService {
@@ -24,15 +21,51 @@ public class PromptService {
     private TagRepository tagRepository;
     
     public List<Prompt> getAllPrompts() {
-        return promptRepository.findAll();
+        List<Prompt> prompts = promptRepository.findAll();
+        for (Prompt prompt : prompts) {
+            loadRelationInfo(prompt);
+        }
+        return prompts;
     }
     
     public Optional<Prompt> getPromptById(Long id) {
-        return promptRepository.findById(id);
+        return promptRepository.findById(id).map(prompt -> {
+            loadRelationInfo(prompt);
+            return prompt;
+        });
+    }
+    
+    public Optional<Prompt> getPromptWithFullChain(Long id) {
+        return promptRepository.findById(id).map(prompt -> {
+            Prompt chain = buildChain(prompt);
+            prompt.setFullChain(chain);
+            loadRelationInfo(prompt);
+            return prompt;
+        });
     }
     
     @Transactional
-    public Prompt createPrompt(Prompt prompt, List<String> tagNames) {
+    public Map<String, Object> createPrompt(Prompt prompt, List<String> tagNames, Long parentId) {
+        Map<String, Object> result = new HashMap<>();
+        
+        if (parentId != null) {
+            Optional<Prompt> parentOpt = promptRepository.findById(parentId);
+            if (parentOpt.isEmpty()) {
+                result.put("success", false);
+                result.put("message", "父级提示词不存在");
+                return result;
+            }
+            
+            Prompt parent = parentOpt.get();
+            if (parent.getChild() != null) {
+                result.put("success", false);
+                result.put("message", "该父级提示词已有子级，不能再添加");
+                return result;
+            }
+            
+            prompt.setParent(parent);
+        }
+        
         Set<Tag> tags = new HashSet<>();
         if (tagNames != null) {
             for (String tagName : tagNames) {
@@ -46,38 +79,92 @@ public class PromptService {
             }
         }
         prompt.setTags(tags);
-        return promptRepository.save(prompt);
+        
+        Prompt savedPrompt = promptRepository.save(prompt);
+        loadRelationInfo(savedPrompt);
+        
+        result.put("success", true);
+        result.put("prompt", savedPrompt);
+        return result;
     }
     
     @Transactional
-    public Optional<Prompt> updatePrompt(Long id, Prompt updatedPrompt, List<String> tagNames) {
-        return promptRepository.findById(id).map(existing -> {
-            existing.setTitle(updatedPrompt.getTitle());
-            existing.setContent(updatedPrompt.getContent());
-            existing.setDescription(updatedPrompt.getDescription());
-            existing.setCategory(updatedPrompt.getCategory());
-            
-            Set<Tag> tags = new HashSet<>();
-            if (tagNames != null) {
-                for (String tagName : tagNames) {
-                    Tag tag = tagRepository.findByName(tagName)
-                        .orElseGet(() -> {
-                            Tag newTag = new Tag();
-                            newTag.setName(tagName);
-                            return tagRepository.save(newTag);
-                        });
-                    tags.add(tag);
+    public Map<String, Object> updatePrompt(Long id, Prompt updatedPrompt, List<String> tagNames, Long parentId) {
+        Map<String, Object> result = new HashMap<>();
+        
+        Optional<Prompt> existingOpt = promptRepository.findById(id);
+        if (existingOpt.isEmpty()) {
+            result.put("success", false);
+            result.put("message", "提示词不存在");
+            return result;
+        }
+        
+        Prompt existing = existingOpt.get();
+        existing.setTitle(updatedPrompt.getTitle());
+        existing.setContent(updatedPrompt.getContent());
+        existing.setDescription(updatedPrompt.getDescription());
+        existing.setCategory(updatedPrompt.getCategory());
+        
+        if (parentId != null && !parentId.equals(id)) {
+            if (existing.getParent() == null || !existing.getParent().getId().equals(parentId)) {
+                Optional<Prompt> parentOpt = promptRepository.findById(parentId);
+                if (parentOpt.isEmpty()) {
+                    result.put("success", false);
+                    result.put("message", "父级提示词不存在");
+                    return result;
                 }
+                
+                Prompt parent = parentOpt.get();
+                if (parent.getChild() != null && !parent.getChild().getId().equals(id)) {
+                    result.put("success", false);
+                    result.put("message", "该父级提示词已有子级，不能再添加");
+                    return result;
+                }
+                
+                if (hasCircularDependency(id, parentId)) {
+                    result.put("success", false);
+                    result.put("message", "不能形成循环级联关系");
+                    return result;
+                }
+                
+                existing.setParent(parent);
             }
-            existing.setTags(tags);
-            
-            return promptRepository.save(existing);
-        });
+        } else if (parentId == null) {
+            existing.setParent(null);
+        }
+        
+        Set<Tag> tags = new HashSet<>();
+        if (tagNames != null) {
+            for (String tagName : tagNames) {
+                Tag tag = tagRepository.findByName(tagName)
+                    .orElseGet(() -> {
+                        Tag newTag = new Tag();
+                        newTag.setName(tagName);
+                        return tagRepository.save(newTag);
+                    });
+                tags.add(tag);
+            }
+        }
+        existing.setTags(tags);
+        
+        Prompt savedPrompt = promptRepository.save(existing);
+        loadRelationInfo(savedPrompt);
+        
+        result.put("success", true);
+        result.put("prompt", savedPrompt);
+        return result;
     }
     
     @Transactional
     public boolean deletePrompt(Long id) {
         if (promptRepository.existsById(id)) {
+            Optional<Prompt> promptOpt = promptRepository.findById(id);
+            if (promptOpt.isPresent()) {
+                Prompt prompt = promptOpt.get();
+                if (prompt.getChild() != null) {
+                    prompt.getChild().setParent(null);
+                }
+            }
             promptRepository.deleteById(id);
             return true;
         }
@@ -94,11 +181,19 @@ public class PromptService {
     }
     
     public List<Prompt> searchByKeyword(String keyword) {
-        return promptRepository.searchByKeyword(keyword);
+        List<Prompt> prompts = promptRepository.searchByKeyword(keyword);
+        for (Prompt prompt : prompts) {
+            loadRelationInfo(prompt);
+        }
+        return prompts;
     }
     
     public List<Prompt> filterByCategoryAndTag(String category, Long tagId) {
-        return promptRepository.filterByCategoryAndTag(category, tagId);
+        List<Prompt> prompts = promptRepository.filterByCategoryAndTag(category, tagId);
+        for (Prompt prompt : prompts) {
+            loadRelationInfo(prompt);
+        }
+        return prompts;
     }
     
     public List<String> getAllCategories() {
@@ -106,10 +201,98 @@ public class PromptService {
     }
     
     public List<Prompt> getMostUsedPrompts() {
-        return promptRepository.findByOrderByUsageCountDesc();
+        List<Prompt> prompts = promptRepository.findByOrderByUsageCountDesc();
+        for (Prompt prompt : prompts) {
+            loadRelationInfo(prompt);
+        }
+        return prompts;
     }
     
     public List<Prompt> getRecentlyUsedPrompts() {
-        return promptRepository.findRecentlyUsed();
+        List<Prompt> prompts = promptRepository.findRecentlyUsed();
+        for (Prompt prompt : prompts) {
+            loadRelationInfo(prompt);
+        }
+        return prompts;
+    }
+    
+    public List<Prompt> getAvailableParents(Long excludeId) {
+        List<Prompt> allPrompts = promptRepository.findAll();
+        List<Prompt> available = new ArrayList<>();
+        
+        for (Prompt prompt : allPrompts) {
+            if (excludeId != null && prompt.getId().equals(excludeId)) {
+                continue;
+            }
+            if (prompt.getChild() == null) {
+                Prompt parentInfo = createMinimalPrompt(prompt);
+                available.add(parentInfo);
+            }
+        }
+        return available;
+    }
+    
+    private void loadRelationInfo(Prompt prompt) {
+        if (prompt.getParent() != null) {
+            prompt.setParentInfo(createMinimalPrompt(prompt.getParent()));
+        }
+        if (prompt.getChild() != null) {
+            prompt.setChildInfo(createMinimalPrompt(prompt.getChild()));
+        }
+    }
+    
+    private Prompt createMinimalPrompt(Prompt original) {
+        Prompt minimal = new Prompt();
+        minimal.setId(original.getId());
+        minimal.setTitle(original.getTitle());
+        minimal.setDescription(original.getDescription());
+        minimal.setCategory(original.getCategory());
+        minimal.setUsageCount(original.getUsageCount());
+        return minimal;
+    }
+    
+    private Prompt buildChain(Prompt start) {
+        Prompt root = findRoot(start);
+        return buildChainFromRoot(root, null);
+    }
+    
+    private Prompt findRoot(Prompt prompt) {
+        if (prompt.getParent() == null) {
+            return prompt;
+        }
+        return findRoot(prompt.getParent());
+    }
+    
+    private Prompt buildChainFromRoot(Prompt current, Prompt parentInChain) {
+        Prompt chainNode = createMinimalPrompt(current);
+        
+        if (parentInChain != null) {
+            chainNode.setParentInfo(parentInChain);
+        }
+        
+        if (current.getChild() != null) {
+            Prompt childChain = buildChainFromRoot(current.getChild(), chainNode);
+            chainNode.setChildInfo(childChain);
+        }
+        
+        return chainNode;
+    }
+    
+    private boolean hasCircularDependency(Long currentId, Long newParentId) {
+        Set<Long> visited = new HashSet<>();
+        visited.add(currentId);
+        
+        Long parentId = newParentId;
+        while (parentId != null && !visited.contains(parentId)) {
+            visited.add(parentId);
+            Optional<Prompt> parentOpt = promptRepository.findById(parentId);
+            if (parentOpt.isPresent() && parentOpt.get().getParent() != null) {
+                parentId = parentOpt.get().getParent().getId();
+            } else {
+                parentId = null;
+            }
+        }
+        
+        return parentId != null && visited.contains(parentId);
     }
 }

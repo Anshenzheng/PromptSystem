@@ -1,5 +1,8 @@
 package com.prompt.system.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.HashSet;
@@ -7,6 +10,7 @@ import java.util.Set;
 
 @Entity
 @Table(name = "prompts")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Prompt {
     
     @Id
@@ -44,6 +48,27 @@ public class Prompt {
         inverseJoinColumns = @JoinColumn(name = "tag_id")
     )
     private Set<Tag> tags = new HashSet<>();
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_id")
+    @JsonIgnore
+    private Prompt parent;
+    
+    @OneToOne(mappedBy = "parent", fetch = FetchType.LAZY)
+    @JsonIgnore
+    private Prompt child;
+    
+    @Transient
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Prompt parentInfo;
+    
+    @Transient
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Prompt childInfo;
+    
+    @Transient
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Prompt fullChain;
     
     @PrePersist
     protected void onCreate() {
@@ -126,5 +151,45 @@ public class Prompt {
     
     public void setTags(Set<Tag> tags) {
         this.tags = tags;
+    }
+    
+    public Prompt getParent() {
+        return parent;
+    }
+    
+    public void setParent(Prompt parent) {
+        this.parent = parent;
+    }
+    
+    public Prompt getChild() {
+        return child;
+    }
+    
+    public void setChild(Prompt child) {
+        this.child = child;
+    }
+    
+    public Prompt getParentInfo() {
+        return parentInfo;
+    }
+    
+    public void setParentInfo(Prompt parentInfo) {
+        this.parentInfo = parentInfo;
+    }
+    
+    public Prompt getChildInfo() {
+        return childInfo;
+    }
+    
+    public void setChildInfo(Prompt childInfo) {
+        this.childInfo = childInfo;
+    }
+    
+    public Prompt getFullChain() {
+        return fullChain;
+    }
+    
+    public void setFullChain(Prompt fullChain) {
+        this.fullChain = fullChain;
     }
 }

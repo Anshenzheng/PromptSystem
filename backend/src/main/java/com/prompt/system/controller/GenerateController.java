@@ -18,7 +18,7 @@ public class GenerateController {
     private DeepSeekService deepSeekService;
     
     @PostMapping
-    public ResponseEntity<Map<String, String>> generatePrompt(@RequestBody Map<String, Object> request) {
+    public ResponseEntity<?> generatePrompt(@RequestBody Map<String, Object> request) {
         String requirement = (String) request.get("requirement");
         @SuppressWarnings("unchecked")
         List<String> styles = (List<String>) request.get("styles");
@@ -28,10 +28,8 @@ public class GenerateController {
         List<String> functions = (List<String>) request.get("functions");
         
         try {
-            String generatedPrompt = deepSeekService.generatePrompt(requirement, styles, scenes, functions);
-            Map<String, String> response = new HashMap<>();
-            response.put("prompt", generatedPrompt);
-            return ResponseEntity.ok(response);
+            Map<String, Object> result = deepSeekService.generateFullPrompt(requirement, styles, scenes, functions);
+            return ResponseEntity.ok(result);
         } catch (Exception e) {
             Map<String, String> response = new HashMap<>();
             response.put("error", "生成提示词失败: " + e.getMessage());
