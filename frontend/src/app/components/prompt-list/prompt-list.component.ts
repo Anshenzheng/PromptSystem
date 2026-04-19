@@ -1,11 +1,13 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, signal, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Prompt, Tag } from '../../models/prompt.model';
 import { PromptService } from '../../services/prompt.service';
 import { TagService } from '../../services/tag.service';
+import { AuthService } from '../../services/auth.service';
 import { PromptModalComponent } from '../prompt-modal/prompt-modal.component';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-prompt-list',
@@ -425,7 +427,7 @@ import { PromptModalComponent } from '../prompt-modal/prompt-modal.component';
     }
   `]
 })
-export class PromptListComponent implements OnInit {
+export class PromptListComponent implements OnInit, OnDestroy {
   prompts = signal<Prompt[]>([]);
   tags = signal<Tag[]>([]);
   categories = signal<string[]>([]);
@@ -440,14 +442,29 @@ export class PromptListComponent implements OnInit {
   
   private allPrompts: Prompt[] = [];
   private searchTimeout: any;
+  private authSub: Subscription | null = null;
   
   constructor(
     private promptService: PromptService,
-    private tagService: TagService
+    private tagService: TagService,
+    private authService: AuthService
   ) {}
   
   ngOnInit(): void {
     this.loadData();
+    
+    this.authSub = this.authService.authChanged$.subscribe(() => {
+      this.loadData();
+    });
+  }
+  
+  ngOnDestroy(): void {
+    if (this.authSub) {
+      this.authSub.unsubscribe();
+    }
+    if (this.searchTimeout) {
+      clearTimeout(this.searchTimeout);
+    }
   }
   
   loadData(): void {

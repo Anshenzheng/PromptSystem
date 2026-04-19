@@ -1,6 +1,6 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, effect } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Observable, tap, catchError, of } from 'rxjs';
+import { Observable, tap, catchError, of, Subject } from 'rxjs';
 import { User, LoginRequest, RegisterRequest, AuthResponse } from '../models/prompt.model';
 
 @Injectable({
@@ -11,10 +11,12 @@ export class AuthService {
   
   private _currentUser = signal<User | null>(null);
   private _token = signal<string | null>(null);
+  private _authChanged = new Subject<boolean>();
   
   public currentUser = computed(() => this._currentUser());
   public token = computed(() => this._token());
   public isLoggedIn = computed(() => this._token() !== null);
+  public authChanged$ = this._authChanged.asObservable();
 
   constructor(private http: HttpClient) {
     this.loadFromStorage();
@@ -40,6 +42,7 @@ export class AuthService {
     localStorage.removeItem('auth_user');
     this._token.set(null);
     this._currentUser.set(null);
+    this._authChanged.next(false);
   }
 
   login(request: LoginRequest): Observable<AuthResponse> {
@@ -50,6 +53,7 @@ export class AuthService {
           localStorage.setItem('auth_user', JSON.stringify(response.user));
           this._token.set(response.token);
           this._currentUser.set(response.user);
+          this._authChanged.next(true);
         }
       }),
       catchError((err) => {
@@ -70,6 +74,7 @@ export class AuthService {
           localStorage.setItem('auth_user', JSON.stringify(response.user));
           this._token.set(response.token);
           this._currentUser.set(response.user);
+          this._authChanged.next(true);
         }
       }),
       catchError((err) => {
