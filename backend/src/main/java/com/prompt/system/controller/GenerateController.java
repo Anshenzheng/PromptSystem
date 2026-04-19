@@ -1,5 +1,6 @@
 package com.prompt.system.controller;
 
+import com.prompt.system.security.UserContext;
 import com.prompt.system.service.DeepSeekService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +20,14 @@ public class GenerateController {
     
     @PostMapping
     public ResponseEntity<?> generatePrompt(@RequestBody Map<String, Object> request) {
+        Long currentUserId = UserContext.getCurrentUserId();
+        if (currentUserId == null) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "请先登录后再使用生成功能");
+            return ResponseEntity.status(401).body(response);
+        }
+        
         String requirement = (String) request.get("requirement");
         @SuppressWarnings("unchecked")
         List<String> styles = (List<String>) request.get("styles");

@@ -87,18 +87,22 @@ import { Subscription } from 'rxjs';
           <div class="prompt-card">
             <div class="card-header" (click)="openModal(prompt)">
               <h3 class="card-title">{{ prompt.title }}</h3>
-              @if (hasRelation(prompt) || !prompt.isPublic) {
-                <div class="badges">
-                  @if (hasRelation(prompt)) {
-                    <span class="relation-badge">
-                      {{ getRelationLabel(prompt) }}
-                    </span>
-                  }
+              <div class="badges">
+                @if (hasRelation(prompt)) {
+                  <span class="relation-badge">
+                    {{ getRelationLabel(prompt) }}
+                  </span>
+                }
+                @if (prompt.isOwner) {
                   @if (!prompt.isPublic) {
-                    <span class="private-badge">私有</span>
+                    <span class="private-badge">我的·私有</span>
+                  } @else {
+                    <span class="owner-badge">我的</span>
                   }
-                </div>
-              }
+                } @else {
+                  <span class="public-badge">公开</span>
+                }
+              </div>
               <div class="card-actions" (click)="$event.stopPropagation()">
                 <button 
                   (click)="copyContent(prompt)" 
@@ -324,6 +328,28 @@ import { Subscription } from 'rxjs';
       display: inline-block;
       padding: 0.2rem 0.5rem;
       background-color: #f59e0b;
+      color: white;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    
+    .owner-badge {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      background-color: #10b981;
+      color: white;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    
+    .public-badge {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      background-color: #6366f1;
       color: white;
       border-radius: 4px;
       font-size: 0.7rem;

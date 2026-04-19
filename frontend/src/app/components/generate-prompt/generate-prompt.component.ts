@@ -1,16 +1,17 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { QuickTag, GenerateRequest, GeneratedPrompt, Prompt } from '../../models/prompt.model';
 import { GenerateService } from '../../services/generate.service';
 import { TagService } from '../../services/tag.service';
 import { PromptService } from '../../services/prompt.service';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-generate-prompt',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   template: `
     <div class="generate-container">
       <div class="generate-header">
@@ -18,196 +19,208 @@ import { PromptService } from '../../services/prompt.service';
         <p class="subtitle">描述你的需求，AI 将帮你生成专业的提示词</p>
       </div>
       
-      <div class="generate-content">
-        <div class="input-section">
-          <div class="form-group">
-            <label class="form-label">需求描述 *</label>
-            <textarea 
-              [(ngModel)]="requirement" 
-              placeholder="描述你想要的提示词用途，例如：我需要一个帮助我学习编程语言的提示词..."
-              class="form-textarea"
-              rows="4"
-            ></textarea>
+      @if (!authService.isLoggedIn()) {
+        <div class="login-required">
+          <div class="login-icon">🔒</div>
+          <h3>需要登录才能使用生成功能</h3>
+          <p>请先登录后再使用智能生成提示词功能</p>
+          <div class="login-buttons">
+            <a routerLink="/login" class="btn btn-primary">立即登录</a>
+            <a routerLink="/register" class="btn btn-outline">还没账号？注册</a>
           </div>
-          
-          <div class="quick-tags-section">
-            <h3 class="section-title">快速选择（可选）</h3>
-            
-            @if (styleTags().length > 0) {
-              <div class="quick-tag-group">
-                <label class="group-label">🎨 风格</label>
-                <div class="tag-options">
-                  @for (tag of styleTags(); track tag.id) {
-                    <button 
-                      type="button"
-                      (click)="toggleTag('style', tag.name)"
-                      class="tag-option"
-                      [class.selected]="selectedStyles().includes(tag.name)"
-                    >
-                      {{ tag.name }}
-                    </button>
-                  }
-                </div>
-              </div>
-            }
-            
-            @if (sceneTags().length > 0) {
-              <div class="quick-tag-group">
-                <label class="group-label">📍 场景</label>
-                <div class="tag-options">
-                  @for (tag of sceneTags(); track tag.id) {
-                    <button 
-                      type="button"
-                      (click)="toggleTag('scene', tag.name)"
-                      class="tag-option"
-                      [class.selected]="selectedScenes().includes(tag.name)"
-                    >
-                      {{ tag.name }}
-                    </button>
-                  }
-                </div>
-              </div>
-            }
-            
-            @if (functionTags().length > 0) {
-              <div class="quick-tag-group">
-                <label class="group-label">⚡ 功能</label>
-                <div class="tag-options">
-                  @for (tag of functionTags(); track tag.id) {
-                    <button 
-                      type="button"
-                      (click)="toggleTag('function', tag.name)"
-                      class="tag-option"
-                      [class.selected]="selectedFunctions().includes(tag.name)"
-                    >
-                      {{ tag.name }}
-                    </button>
-                  }
-                </div>
-              </div>
-            }
-          </div>
-          
-          <button 
-            (click)="generatePrompt()" 
-            class="btn btn-primary btn-generate"
-            [disabled]="!requirement.trim() || generating()"
-          >
-            {{ generating() ? '✨ 生成中...' : '✨ 生成提示词' }}
-          </button>
         </div>
-        
-        <div class="output-section">
-          @if (error()) {
-            <div class="error-message">
-              {{ error() }}
+      } @else {
+        <div class="generate-content">
+          <div class="input-section">
+            <div class="form-group">
+              <label class="form-label">需求描述 *</label>
+              <textarea 
+                [(ngModel)]="requirement" 
+                placeholder="描述你想要的提示词用途，例如：我需要一个帮助我学习编程语言的提示词..."
+                class="form-textarea"
+                rows="4"
+              ></textarea>
             </div>
-          }
-          
-          @if (generatedResult()) {
-            <div class="result-container">
-              <div class="result-header">
-                <h3 class="result-title">生成结果</h3>
-                <div class="result-actions">
-                  <button (click)="copyResult()" class="btn btn-outline btn-sm">
-                    📋 复制
-                  </button>
-                  <button (click)="savePrompt()" class="btn btn-primary btn-sm" [disabled]="saving()">
-                    {{ saving() ? '保存中...' : '💾 保存' }}
-                  </button>
-                </div>
-              </div>
+            
+            <div class="quick-tags-section">
+              <h3 class="section-title">快速选择（可选）</h3>
               
-              <div class="generated-meta">
-                <div class="meta-item">
-                  <span class="meta-label">标题</span>
-                  <input 
-                    type="text" 
-                    [(ngModel)]="editTitle"
-                    class="meta-input"
-                  >
-                </div>
-                <div class="meta-item">
-                  <span class="meta-label">分类</span>
-                  <select [(ngModel)]="editCategory" class="meta-select">
-                    <option value="">无分类</option>
-                    @for (cat of existingCategories(); track cat) {
-                      <option [value]="cat">{{ cat }}</option>
-                    }
-                  </select>
-                </div>
-                <div class="meta-item">
-                  <span class="meta-label">级联父级</span>
-                  <select [(ngModel)]="editParentId" class="meta-select">
-                    <option [ngValue]="null">无极联</option>
-                    @for (parent of availableParents(); track parent.id) {
-                      <option [ngValue]="parent.id">{{ parent.title }}</option>
-                    }
-                  </select>
-                </div>
-                <div class="meta-item">
-                  <span class="meta-label">可见性</span>
-                  <select [(ngModel)]="editIsPublic" class="meta-select">
-                    <option [ngValue]="true">公开</option>
-                    <option [ngValue]="false">私有</option>
-                  </select>
-                </div>
-              </div>
-              
-              <div class="meta-item full-width">
-                <span class="meta-label">描述</span>
-                <textarea 
-                  [(ngModel)]="editDescription"
-                  class="meta-textarea"
-                  rows="2"
-                ></textarea>
-              </div>
-              
-              <div class="meta-item full-width">
-                <span class="meta-label">标签</span>
-                <div class="tags-editor">
-                  <div class="selected-tags">
-                    @for (tag of editTags(); track tag) {
-                      <span class="tag">
-                        {{ tag }}
-                        <button 
-                          type="button" 
-                          (click)="removeEditTag(tag)"
-                          class="tag-remove"
-                        >×</button>
-                      </span>
+              @if (styleTags().length > 0) {
+                <div class="quick-tag-group">
+                  <label class="group-label">🎨 风格</label>
+                  <div class="tag-options">
+                    @for (tag of styleTags(); track tag.id) {
+                      <button 
+                        type="button"
+                        (click)="toggleTag('style', tag.name)"
+                        class="tag-option"
+                        [class.selected]="selectedStyles().includes(tag.name)"
+                      >
+                        {{ tag.name }}
+                      </button>
                     }
                   </div>
-                  <input 
-                    type="text" 
-                    [(ngModel)]="newTagInput"
-                    (keydown.enter)="addEditTag(); $event.preventDefault()"
-                    placeholder="输入标签后按回车添加"
-                    class="tag-input"
-                  >
                 </div>
-              </div>
+              }
               
-              <div class="content-section">
-                <h4 class="section-title">📝 提示词内容</h4>
-                <div class="result-content">
+              @if (sceneTags().length > 0) {
+                <div class="quick-tag-group">
+                  <label class="group-label">📍 场景</label>
+                  <div class="tag-options">
+                    @for (tag of sceneTags(); track tag.id) {
+                      <button 
+                        type="button"
+                        (click)="toggleTag('scene', tag.name)"
+                        class="tag-option"
+                        [class.selected]="selectedScenes().includes(tag.name)"
+                      >
+                        {{ tag.name }}
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
+              
+              @if (functionTags().length > 0) {
+                <div class="quick-tag-group">
+                  <label class="group-label">⚡ 功能</label>
+                  <div class="tag-options">
+                    @for (tag of functionTags(); track tag.id) {
+                      <button 
+                        type="button"
+                        (click)="toggleTag('function', tag.name)"
+                        class="tag-option"
+                        [class.selected]="selectedFunctions().includes(tag.name)"
+                      >
+                        {{ tag.name }}
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+            
+            <button 
+              (click)="generatePrompt()" 
+              class="btn btn-primary btn-generate"
+              [disabled]="!requirement.trim() || generating()"
+            >
+              {{ generating() ? '✨ 生成中...' : '✨ 生成提示词' }}
+            </button>
+          </div>
+          
+          <div class="output-section">
+            @if (error()) {
+              <div class="error-message">
+                {{ error() }}
+              </div>
+            }
+            
+            @if (generatedResult()) {
+              <div class="result-container">
+                <div class="result-header">
+                  <h3 class="result-title">生成结果</h3>
+                  <div class="result-actions">
+                    <button (click)="copyResult()" class="btn btn-outline btn-sm">
+                      📋 复制
+                    </button>
+                    <button (click)="savePrompt()" class="btn btn-primary btn-sm" [disabled]="saving()">
+                      {{ saving() ? '保存中...' : '💾 保存' }}
+                    </button>
+                  </div>
+                </div>
+                
+                <div class="generated-meta">
+                  <div class="meta-item">
+                    <span class="meta-label">标题</span>
+                    <input 
+                      type="text" 
+                      [(ngModel)]="editTitle"
+                      class="meta-input"
+                    >
+                  </div>
+                  <div class="meta-item">
+                    <span class="meta-label">分类</span>
+                    <select [(ngModel)]="editCategory" class="meta-select">
+                      <option value="">无分类</option>
+                      @for (cat of existingCategories(); track cat) {
+                        <option [value]="cat">{{ cat }}</option>
+                      }
+                    </select>
+                  </div>
+                  <div class="meta-item">
+                    <span class="meta-label">级联父级</span>
+                    <select [(ngModel)]="editParentId" class="meta-select">
+                      <option [ngValue]="null">无极联</option>
+                      @for (parent of availableParents(); track parent.id) {
+                        <option [ngValue]="parent.id">{{ parent.title }}</option>
+                      }
+                    </select>
+                  </div>
+                  <div class="meta-item">
+                    <span class="meta-label">可见性</span>
+                    <select [(ngModel)]="editIsPublic" class="meta-select">
+                      <option [ngValue]="true">公开</option>
+                      <option [ngValue]="false">私有</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <div class="meta-item full-width">
+                  <span class="meta-label">描述</span>
                   <textarea 
-                    [(ngModel)]="editContent"
-                    class="content-editor"
-                    rows="12"
+                    [(ngModel)]="editDescription"
+                    class="meta-textarea"
+                    rows="2"
                   ></textarea>
                 </div>
+                
+                <div class="meta-item full-width">
+                  <span class="meta-label">标签</span>
+                  <div class="tags-editor">
+                    <div class="selected-tags">
+                      @for (tag of editTags(); track tag) {
+                        <span class="tag">
+                          {{ tag }}
+                          <button 
+                            type="button" 
+                            (click)="removeEditTag(tag)"
+                            class="tag-remove"
+                          >×</button>
+                        </span>
+                      }
+                    </div>
+                    <input 
+                      type="text" 
+                      [(ngModel)]="newTagInput"
+                      (keydown.enter)="addEditTag(); $event.preventDefault()"
+                      placeholder="输入标签后按回车添加"
+                      class="tag-input"
+                    >
+                  </div>
+                </div>
+                
+                <div class="content-section">
+                  <h4 class="section-title">📝 提示词内容</h4>
+                  <div class="result-content">
+                    <textarea 
+                      [(ngModel)]="editContent"
+                      class="content-editor"
+                      rows="12"
+                    ></textarea>
+                  </div>
+                </div>
               </div>
-            </div>
-          } @else {
-            <div class="empty-state">
-              <div class="empty-icon">✨</div>
-              <p>输入需求后点击生成按钮</p>
-              <p class="hint">AI 将生成标题、分类、描述和内容</p>
-            </div>
-          }
+            } @else {
+              <div class="empty-state">
+                <div class="empty-icon">✨</div>
+                <p>输入需求后点击生成按钮</p>
+                <p class="hint">AI 将生成标题、分类、描述和内容</p>
+              </div>
+            }
+          </div>
         </div>
-      </div>
+      }
     </div>
   `,
   styles: [`
@@ -232,6 +245,39 @@ import { PromptService } from '../../services/prompt.service';
       margin: 0;
       color: var(--text-secondary);
       font-size: 1rem;
+    }
+    
+    .login-required {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 3rem;
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      gap: 1rem;
+    }
+    
+    .login-icon {
+      font-size: 4rem;
+    }
+    
+    .login-required h3 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+    
+    .login-required p {
+      margin: 0;
+      color: var(--text-secondary);
+    }
+    
+    .login-buttons {
+      display: flex;
+      gap: 1rem;
+      margin-top: 1rem;
     }
     
     .generate-content {
@@ -633,7 +679,8 @@ export class GeneratePromptComponent implements OnInit {
     private generateService: GenerateService,
     private tagService: TagService,
     private promptService: PromptService,
-    private router: Router
+    private router: Router,
+    public authService: AuthService
   ) {}
   
   ngOnInit(): void {
