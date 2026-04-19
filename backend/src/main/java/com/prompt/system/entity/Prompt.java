@@ -41,6 +41,9 @@ public class Prompt {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
     
+    @Column(name = "user_id")
+    private Long userId;
+    
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
         name = "prompt_tags",
@@ -119,6 +122,14 @@ public class Prompt {
     
     public void setCategory(String category) {
         this.category = category;
+    }
+    
+    public Long getUserId() {
+        return userId;
+    }
+    
+    public void setUserId(Long userId) {
+        this.userId = userId;
     }
     
     public Integer getUsageCount() {

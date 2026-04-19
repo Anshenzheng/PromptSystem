@@ -4,6 +4,7 @@ import com.prompt.system.entity.Prompt;
 import com.prompt.system.entity.Tag;
 import com.prompt.system.repository.PromptRepository;
 import com.prompt.system.repository.TagRepository;
+import com.prompt.system.security.UserContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,6 +49,13 @@ public class PromptService {
     public Map<String, Object> createPrompt(Prompt prompt, List<String> tagNames, Long parentId) {
         Map<String, Object> result = new HashMap<>();
         
+        Long currentUserId = UserContext.getCurrentUserId();
+        if (currentUserId == null) {
+            result.put("success", false);
+            result.put("message", "请先登录");
+            return result;
+        }
+        
         if (parentId != null) {
             Optional<Prompt> parentOpt = promptRepository.findById(parentId);
             if (parentOpt.isEmpty()) {
@@ -79,6 +87,7 @@ public class PromptService {
             }
         }
         prompt.setTags(tags);
+        prompt.setUserId(currentUserId);
         
         Prompt savedPrompt = promptRepository.save(prompt);
         loadRelationInfo(savedPrompt);
@@ -92,6 +101,13 @@ public class PromptService {
     public Map<String, Object> updatePrompt(Long id, Prompt updatedPrompt, List<String> tagNames, Long parentId) {
         Map<String, Object> result = new HashMap<>();
         
+        Long currentUserId = UserContext.getCurrentUserId();
+        if (currentUserId == null) {
+            result.put("success", false);
+            result.put("message", "请先登录");
+            return result;
+        }
+        
         Optional<Prompt> existingOpt = promptRepository.findById(id);
         if (existingOpt.isEmpty()) {
             result.put("success", false);
@@ -100,6 +116,13 @@ public class PromptService {
         }
         
         Prompt existing = existingOpt.get();
+        
+        if (existing.getUserId() != null && !existing.getUserId().equals(currentUserId)) {
+            result.put("success", false);
+            result.put("message", "您没有权限修改此提示词");
+            return result;
+        }
+        
         existing.setTitle(updatedPrompt.getTitle());
         existing.setContent(updatedPrompt.getContent());
         existing.setDescription(updatedPrompt.getDescription());
@@ -156,19 +179,38 @@ public class PromptService {
     }
     
     @Transactional
-    public boolean deletePrompt(Long id) {
-        if (promptRepository.existsById(id)) {
-            Optional<Prompt> promptOpt = promptRepository.findById(id);
-            if (promptOpt.isPresent()) {
-                Prompt prompt = promptOpt.get();
-                if (prompt.getChild() != null) {
-                    prompt.getChild().setParent(null);
-                }
-            }
-            promptRepository.deleteById(id);
-            return true;
+    public Map<String, Object> deletePrompt(Long id) {
+        Map<String, Object> result = new HashMap<>();
+        
+        Long currentUserId = UserContext.getCurrentUserId();
+        if (currentUserId == null) {
+            result.put("success", false);
+            result.put("message", "请先登录");
+            return result;
         }
-        return false;
+        
+        Optional<Prompt> promptOpt = promptRepository.findById(id);
+        if (promptOpt.isEmpty()) {
+            result.put("success", false);
+            result.put("message", "提示词不存在");
+            return result;
+        }
+        
+        Prompt prompt = promptOpt.get();
+        if (prompt.getUserId() != null && !prompt.getUserId().equals(currentUserId)) {
+            result.put("success", false);
+            result.put("message", "您没有权限删除此提示词");
+            return result;
+        }
+        
+        if (prompt.getChild() != null) {
+            prompt.getChild().setParent(null);
+        }
+        
+        promptRepository.deleteById(id);
+        result.put("success", true);
+        result.put("deleted", true);
+        return result;
     }
     
     @Transactional

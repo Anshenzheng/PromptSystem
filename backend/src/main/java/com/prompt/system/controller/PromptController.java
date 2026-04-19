@@ -110,11 +110,16 @@ public class PromptController {
     }
     
     @DeleteMapping("/{id}")
-    public ResponseEntity<Map<String, Boolean>> deletePrompt(@PathVariable Long id) {
-        boolean deleted = promptService.deletePrompt(id);
-        Map<String, Boolean> response = new HashMap<>();
-        response.put("deleted", deleted);
-        return ResponseEntity.ok(response);
+    public ResponseEntity<?> deletePrompt(@PathVariable Long id) {
+        Map<String, Object> result = promptService.deletePrompt(id);
+        
+        if ((boolean) result.get("success")) {
+            Map<String, Boolean> response = new HashMap<>();
+            response.put("deleted", true);
+            return ResponseEntity.ok(response);
+        } else {
+            return ResponseEntity.badRequest().body(result);
+        }
     }
     
     @PostMapping("/{id}/use")
