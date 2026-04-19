@@ -67,7 +67,16 @@ public class PromptController {
             }
         }
         
-        Map<String, Object> result = promptService.createPrompt(prompt, tagNames, parentId);
+        Boolean isPublic = null;
+        if (request.get("isPublic") != null) {
+            if (request.get("isPublic") instanceof Boolean) {
+                isPublic = (Boolean) request.get("isPublic");
+            } else if (request.get("isPublic") instanceof String) {
+                isPublic = Boolean.parseBoolean((String) request.get("isPublic"));
+            }
+        }
+        
+        Map<String, Object> result = promptService.createPrompt(prompt, tagNames, parentId, isPublic);
         
         if ((boolean) result.get("success")) {
             return ResponseEntity.ok(result.get("prompt"));
@@ -100,7 +109,16 @@ public class PromptController {
             }
         }
         
-        Map<String, Object> result = promptService.updatePrompt(id, updatedPrompt, tagNames, parentId);
+        Boolean isPublic = null;
+        if (request.get("isPublic") != null) {
+            if (request.get("isPublic") instanceof Boolean) {
+                isPublic = (Boolean) request.get("isPublic");
+            } else if (request.get("isPublic") instanceof String) {
+                isPublic = Boolean.parseBoolean((String) request.get("isPublic"));
+            }
+        }
+        
+        Map<String, Object> result = promptService.updatePrompt(id, updatedPrompt, tagNames, parentId, isPublic);
         
         if ((boolean) result.get("success")) {
             return ResponseEntity.ok(result.get("prompt"));

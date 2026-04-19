@@ -1,10 +1,12 @@
 com\prompt\system\config\SecurityConfig.class
+com\prompt\system\security\UserContext.class
 com\prompt\system\service\TagService.class
 com\prompt\system\repository\UserRepository.class
 com\prompt\system\security\JwtUtil.class
 com\prompt\system\service\QuickTagService.class
 com\prompt\system\controller\AuthController.class
 com\prompt\system\entity\QuickTag.class
+com\prompt\system\security\JwtAuthenticationFilter.class
 com\prompt\system\controller\GenerateController.class
 com\prompt\system\repository\QuickTagRepository.class
 com\prompt\system\controller\QuickTagController.class

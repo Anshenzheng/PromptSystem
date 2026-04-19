@@ -44,6 +44,13 @@ public class Prompt {
     @Column(name = "user_id")
     private Long userId;
     
+    @Column(name = "is_public")
+    private Boolean isPublic = true;
+    
+    @Transient
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Boolean isOwner;
+    
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
         name = "prompt_tags",
@@ -130,6 +137,22 @@ public class Prompt {
     
     public void setUserId(Long userId) {
         this.userId = userId;
+    }
+    
+    public Boolean getIsPublic() {
+        return isPublic;
+    }
+    
+    public void setIsPublic(Boolean isPublic) {
+        this.isPublic = isPublic;
+    }
+    
+    public Boolean getIsOwner() {
+        return isOwner;
+    }
+    
+    public void setIsOwner(Boolean isOwner) {
+        this.isOwner = isOwner;
     }
     
     public Integer getUsageCount() {

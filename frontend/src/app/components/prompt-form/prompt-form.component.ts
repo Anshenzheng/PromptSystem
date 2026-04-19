@@ -72,6 +72,36 @@ import { TagService } from '../../services/tag.service';
           </div>
           
           <div class="form-group">
+            <label class="form-label">可见性</label>
+            <div class="visibility-options">
+              <label class="visibility-option">
+                <input 
+                  type="radio" 
+                  [(ngModel)]="formData.isPublic" 
+                  [value]="true"
+                  name="isPublic"
+                >
+                <span class="radio-text">
+                  <strong>公开</strong>
+                  <span class="radio-hint">所有人可见</span>
+                </span>
+              </label>
+              <label class="visibility-option">
+                <input 
+                  type="radio" 
+                  [(ngModel)]="formData.isPublic" 
+                  [value]="false"
+                  name="isPublic"
+                >
+                <span class="radio-text">
+                  <strong>私有</strong>
+                  <span class="radio-hint">仅自己可见</span>
+                </span>
+              </label>
+            </div>
+          </div>
+          
+          <div class="form-group">
             <label class="form-label">描述</label>
             <textarea 
               [(ngModel)]="formData.description" 
@@ -396,7 +426,8 @@ export class PromptFormComponent implements OnInit {
     description: '',
     category: '',
     tags: [],
-    parentId: null
+    parentId: null,
+    isPublic: true
   };
   
   constructor(
@@ -461,7 +492,8 @@ export class PromptFormComponent implements OnInit {
           description: prompt.description || '',
           category: prompt.category || '',
           tags: prompt.tags.map(t => t.name),
-          parentId: prompt.parentInfo?.id || null
+          parentId: prompt.parentInfo?.id || null,
+          isPublic: prompt.isPublic !== undefined ? prompt.isPublic : true
         };
       },
       error: (err) => {
@@ -515,7 +547,8 @@ export class PromptFormComponent implements OnInit {
       description: this.formData.description?.trim() || undefined,
       category: this.formData.category?.trim() || undefined,
       tags: this.formData.tags,
-      parentId: this.formData.parentId
+      parentId: this.formData.parentId,
+      isPublic: this.formData.isPublic
     };
     
     const request = this.isEdit 

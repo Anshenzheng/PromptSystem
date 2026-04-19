@@ -6,6 +6,7 @@ D:\Annan\AI\anotherWay\trae\solo\0419\PromptSystem\backend\src\main\java\com\pro
 D:\Annan\AI\anotherWay\trae\solo\0419\PromptSystem\backend\src\main\java\com\prompt\system\service\UserService.java
 D:\Annan\AI\anotherWay\trae\solo\0419\PromptSystem\backend\src\main\java\com\prompt\system\controller\TagController.java
 D:\Annan\AI\anotherWay\trae\solo\0419\PromptSystem\backend\src\main\java\com\prompt\system\service\DeepSeekService.java
+D:\Annan\AI\anotherWay\trae\solo\0419\PromptSystem\backend\src\main\java\com\prompt\system\security\UserContext.java
 D:\Annan\AI\anotherWay\trae\solo\0419\PromptSystem\backend\src\main\java\com\prompt\system\entity\Tag.java
 D:\Annan\AI\anotherWay\trae\solo\0419\PromptSystem\backend\src\main\java\com\prompt\system\repository\QuickTagRepository.java
 D:\Annan\AI\anotherWay\trae\solo\0419\PromptSystem\backend\src\main\java\com\prompt\system\security\JwtUtil.java
@@ -14,6 +15,7 @@ D:\Annan\AI\anotherWay\trae\solo\0419\PromptSystem\backend\src\main\java\com\pro
 D:\Annan\AI\anotherWay\trae\solo\0419\PromptSystem\backend\src\main\java\com\prompt\system\controller\QuickTagController.java
 D:\Annan\AI\anotherWay\trae\solo\0419\PromptSystem\backend\src\main\java\com\prompt\system\controller\PromptController.java
 D:\Annan\AI\anotherWay\trae\solo\0419\PromptSystem\backend\src\main\java\com\prompt\system\config\SecurityConfig.java
+D:\Annan\AI\anotherWay\trae\solo\0419\PromptSystem\backend\src\main\java\com\prompt\system\security\JwtAuthenticationFilter.java
 D:\Annan\AI\anotherWay\trae\solo\0419\PromptSystem\backend\src\main\java\com\prompt\system\entity\QuickTag.java
 D:\Annan\AI\anotherWay\trae\solo\0419\PromptSystem\backend\src\main\java\com\prompt\system\entity\User.java
 D:\Annan\AI\anotherWay\trae\solo\0419\PromptSystem\backend\src\main\java\com\prompt\system\repository\UserRepository.java
